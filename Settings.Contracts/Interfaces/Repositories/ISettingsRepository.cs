@@ -12,11 +12,9 @@ public interface ISettingsRepository
 
     Task<SettingValue> GetSettingValueAsync(int settingId, int settingValueId);
 
-    Task<IReadOnlyList<SettingValue>> GetSettingsValuesAsync(int settingId);
-
     Task<Setting> GetSettingAsync(int settingId);
 
     Task<bool> IsSettingNameAlreadyTaken(string settingName);
 
-    Task<SettingDto> GetSettingValueAsync(int settingId, DateTime? validFrom);
+    Task<SettingDto> GetSettingDto(int settingId, DateTime? validFrom);
 }

@@ -14,6 +14,8 @@ public class Program
 
         builder.Services.Register();
 
+        builder.Services.AddSwaggerGen();
+
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
@@ -22,10 +24,14 @@ public class Program
 
         app.UseAuthorization();
 
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
         app.MapControllers();
 
         app.Run();
-
-        /////////////// ADD SWAGGER.
     }
 }

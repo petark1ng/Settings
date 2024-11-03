@@ -1,7 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Settings.Api.Settings;
 using Settings.Contracts.Interfaces;
 using Settings.Contracts.Interfaces.Repositories;
 using Settings.Contracts.Interfaces.Services;
+using Settings.Contracts.Settings;
 using Settings.Infrastructure.Database.Context;
 using Settings.Infrastructure.Repositories;
 using Settings.Infrastructure.UnitOfWork;
@@ -13,6 +16,14 @@ public static class RegisterServices
 {
     public static IServiceCollection Register(this IServiceCollection services)
     {
+        // Settings
+        services.AddOptions<AppSettings>()
+            .BindConfiguration(AppSettings.Key)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IAppSettings>(sp => sp.GetRequiredService<IOptions<AppSettings>>().Value);
+
         // Services
         services.AddScoped<ISettingsService, SettingsService>();
 
@@ -23,10 +34,10 @@ public static class RegisterServices
 
         services.AddDbContext<SettingsDbContext>((provider, options) =>
         {
-            // IAppSettings appSettings = provider.GetService<IAppSettings>();
+            IAppSettings appSettings = provider.GetService<IAppSettings>()!;
 
             options.UseSqlServer(
-                "Server=(localdb)\\MSSQLLocalDB;Database=SettingsDatabase;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True", // recheck this and use it from appsettings.
+                appSettings.DatabaseConnectionString,
                 sqlServerOptionsAction: sqlOptions =>
                 {
                     sqlOptions.EnableRetryOnFailure(

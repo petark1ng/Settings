@@ -30,6 +30,7 @@ public class SettingsRepository : RepositoryBase, ISettingsRepository
                       select new SettingDto
                       {
                           Id = dbSetting.Id,
+                          SettingValueId = dbSettingValues.Id,
                           SettingName = dbSetting.Name,
                           ValidFrom = dbSettingValues.ValidFrom,
                           Value = dbSettingValues.Value
@@ -50,14 +51,10 @@ public class SettingsRepository : RepositoryBase, ISettingsRepository
         return dbSettingValue;
     }
 
-    public async Task<IReadOnlyList<SettingValue>> GetSettingsValuesAsync(int settingId)
-    {
-        return await All<SettingValue>().Where(x => x.SettingFk == settingId).ToArrayAsync();
-    }
-
     public async Task<Setting> GetSettingAsync(int settingId)
     {
-        Setting? dbSetting = await All<Setting>().SingleOrDefaultAsync(x => x.Id == settingId);
+        Setting? dbSetting = await All<Setting>().Include(x => x.SettingValues)
+                                                 .SingleOrDefaultAsync(x => x.Id == settingId);
 
         if (dbSetting is null)
         {
@@ -72,9 +69,9 @@ public class SettingsRepository : RepositoryBase, ISettingsRepository
         return await AllWithoutTracking<Setting>().AnyAsync(x => x.Name.ToLower() == settingName.ToLower());
     }
 
-    public async Task<SettingDto> GetSettingValueAsync(int settingId, DateTime? validFrom)
+    public async Task<SettingDto> GetSettingDto(int settingId, DateTime? validFrom)
     {
-        IQueryable<SettingDto> settingsDtos = from dbSetting in AllWithoutTracking<Setting>()
+        IQueryable<SettingDto> settingsDtos = from dbSetting in AllWithoutTracking<Setting>().Where(x => x.Id == settingId)
                                               join dbSettingValues in AllWithoutTracking<SettingValue>()
                                                   on dbSetting.Id equals dbSettingValues.SettingFk
                                               select new SettingDto
@@ -89,9 +86,8 @@ public class SettingsRepository : RepositoryBase, ISettingsRepository
 
         if (validFrom.HasValue)
         {
-            return await settingsDtos.SingleOrDefaultAsync(x => x.ValidFrom <= validFrom.Value &&
-                                                                x.ValidTo.HasValue &&
-                                                                validFrom.Value <= x.ValidTo)
+            return await settingsDtos.SingleOrDefaultAsync(x => (x.ValidFrom <= validFrom.Value && x.ValidTo.HasValue && validFrom.Value <= x.ValidTo) ||
+                                                                (x.ValidFrom <= validFrom && !x.ValidTo.HasValue))
                 ?? throw new NotFoundException("No setting values for the provided period");
         }
 

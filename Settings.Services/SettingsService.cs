@@ -25,7 +25,7 @@ public class SettingsService : ISettingsService
 
         if (isSettingNameTaken)
         {
-            throw new AlreadyExistsException("Setting with that name already exists"); // Test.
+            throw new AlreadyExistsException("Setting with that name already exists");
         }
 
         Setting newSetting = new Setting
@@ -33,7 +33,7 @@ public class SettingsService : ISettingsService
             Name = request.Name
         };
 
-        _settingsRepository.InsertSetting(newSetting); // Test.
+        _settingsRepository.InsertSetting(newSetting);
 
         await _unitOfWork.SaveChangesAsync();
     }
@@ -42,16 +42,13 @@ public class SettingsService : ISettingsService
     {
         Setting dbSetting = await _settingsRepository.GetSettingAsync(settingId: settingId);
 
-        IReadOnlyList<SettingValue> dbSettingValues = await _settingsRepository.GetSettingsValuesAsync(settingId: settingId); // da gi spojam ovoj i gorniot vo eden.
-
-        bool isSettingValuePeriodOverlapping = dbSettingValues.Any(x => x.ValidFrom <= request.ValidFrom &&
-                                                                        x.ValidTo.HasValue &&
-                                                                        x.ValidTo >= request.ValidFrom); // maybe first check if no elements, than avoid all the code under.
-                                                                                                         // compare x.ValidTo with logic from repo.
+        bool isSettingValuePeriodOverlapping = dbSetting.SettingValues.Any(x => x.ValidFrom <= request.ValidFrom &&
+                                                                                x.ValidTo.HasValue &&
+                                                                                x.ValidTo >= request.ValidFrom);
 
         if (isSettingValuePeriodOverlapping)
         {
-            throw new NotAllowedException("There is a setting value already declared for that period"); // Test.
+            throw new NotAllowedException("There is a setting value already declared for that period");
         }
 
         var newSettingValue = new SettingValue
@@ -60,7 +57,7 @@ public class SettingsService : ISettingsService
             Value = request.Value
         };
 
-        SettingValue? latestSettingValue = dbSettingValues.SingleOrDefault(x => !x.ValidTo.HasValue);
+        SettingValue? latestSettingValue = dbSetting.SettingValues.SingleOrDefault(x => !x.ValidTo.HasValue);
 
         if (latestSettingValue is not null)
         {
@@ -70,11 +67,11 @@ public class SettingsService : ISettingsService
             }
             else
             {
-                SettingValue? firstSettingValue = dbSettingValues.MinBy(x => x.ValidFrom);
+                SettingValue? firstSettingValue = dbSetting.SettingValues.MinBy(x => x.ValidFrom);
 
                 if (firstSettingValue is null)
                 {
-                    throw new NotFoundException("Setting with the lowest validity value not found"); // Test.
+                    throw new NotFoundException("Setting with the lowest validity value not found");
                 }
 
                 newSettingValue.ValidTo = firstSettingValue.ValidFrom.AddSeconds(-1);
