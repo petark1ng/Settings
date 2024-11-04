@@ -9,6 +9,8 @@ namespace Settings.Services;
 
 public class SettingsService : ISettingsService
 {
+    private const int MINUS_ONE = -1;
+
     private readonly ISettingsRepository _settingsRepository;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -63,18 +65,14 @@ public class SettingsService : ISettingsService
         {
             if (request.ValidFrom > latestSettingValue.ValidFrom)
             {
-                latestSettingValue.ValidTo = request.ValidFrom.AddSeconds(-1);
+                latestSettingValue.ValidTo = GetAppropriateSettingValueValidToDate(request.ValidFrom);
             }
             else
             {
-                SettingValue? firstSettingValue = dbSetting.SettingValues.MinBy(x => x.ValidFrom);
+                SettingValue? firstSettingValue = dbSetting.SettingValues.MinBy(x => x.ValidFrom)
+                                                                         ?? throw new NotFoundException("Setting with the lowest validity value not found");
 
-                if (firstSettingValue is null)
-                {
-                    throw new NotFoundException("Setting with the lowest validity value not found");
-                }
-
-                newSettingValue.ValidTo = firstSettingValue.ValidFrom.AddSeconds(-1);
+                newSettingValue.ValidTo = GetAppropriateSettingValueValidToDate(firstSettingValue.ValidFrom);
             }
         }
 
@@ -97,31 +95,24 @@ public class SettingsService : ISettingsService
     {
         Setting dbSetting = await _settingsRepository.GetSettingAsync(settingId: settingId);
 
-        SettingValue? dbSettingValueToBeDeleted = dbSetting.SettingValues.SingleOrDefault(x => x.Id == settingValueId);
-
-        if (dbSettingValueToBeDeleted is null)
-        {
-            throw new NotFoundException($"The setting value with id: {settingValueId} for setting with id: {settingId} was not found");
-        }
+        SettingValue? dbSettingValueToBeDeleted = dbSetting.SettingValues.SingleOrDefault(x => x.Id == settingValueId)
+                                                                         ?? throw new NotFoundException($"The setting value with id: {settingValueId} for setting with id: {settingId} was not found");
 
         if (dbSettingValueToBeDeleted.ValidTo.HasValue)
         {
-            SettingValue? previousSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidTo.HasValue &&
-                                                                                              x.ValidTo.Value == dbSettingValueToBeDeleted.ValidFrom.AddSeconds(-1));
+            SettingValue? previousSettingValue = GetPreviousSettingValue(dbSetting, dbSettingValueToBeDeleted);
 
             if (previousSettingValue is not null)
             {
-                SettingValue? nextSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidFrom == dbSettingValueToBeDeleted.ValidTo.Value.AddSeconds(1))
+                SettingValue? nextSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidFrom.AddSeconds(MINUS_ONE) == dbSettingValueToBeDeleted.ValidTo.Value)
                                                                          ?? throw new NotFoundException($"Internal server error.");
 
-                previousSettingValue.ValidTo = nextSettingValue.ValidFrom.AddSeconds(-1);
+                previousSettingValue.ValidTo = GetAppropriateSettingValueValidToDate(nextSettingValue.ValidFrom);
             }
         }
         else
         {
-            // This means that we are deleting the last setting, and we need to set validTo to the previous to null, so it must exist, if it doesnt that means it is only one.
-            SettingValue? previousSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidTo.HasValue &&
-                                                                                              x.ValidTo.Value == dbSettingValueToBeDeleted.ValidFrom.AddSeconds(-1));
+            SettingValue? previousSettingValue = GetPreviousSettingValue(dbSetting, dbSettingValueToBeDeleted);
 
             if (previousSettingValue is not null)
             {
@@ -132,5 +123,16 @@ public class SettingsService : ISettingsService
         _settingsRepository.DeleteSettingValue(dbSettingValueToBeDeleted);
 
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    private static SettingValue? GetPreviousSettingValue(Setting dbSetting, SettingValue dbSettingValueToBeDeleted)
+    {
+        return dbSetting.SettingValues.SingleOrDefault(x => x.ValidTo.HasValue &&
+                                                            x.ValidTo.Value == dbSettingValueToBeDeleted.ValidFrom.AddSeconds(MINUS_ONE));
+    }
+
+    private static DateTime GetAppropriateSettingValueValidToDate(DateTime validFrom)
+    {
+        return validFrom.AddSeconds(MINUS_ONE);
     }
 }

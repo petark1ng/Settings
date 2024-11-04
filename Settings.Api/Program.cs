@@ -1,3 +1,4 @@
+using Settings.Api.Middlewares;
 using Settings.Api.Registers;
 
 namespace Settings.Api;
@@ -23,6 +24,8 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
+
+        app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
         if (app.Environment.IsDevelopment())
         {
