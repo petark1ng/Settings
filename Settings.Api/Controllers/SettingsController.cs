@@ -37,8 +37,8 @@ public class SettingsController : ControllerBase
     [Route("{settingId:int}")]
     public async Task<SettingDto> GetSettingValue([FromRoute] int settingId, [FromQuery] DateTime? validFrom)
     {
-        return await _settingsRepository.GetSettingDto(settingId: settingId,
-                                                       validFrom: validFrom);
+        return await _settingsRepository.GetSettingDtoAsync(settingId: settingId,
+                                                            validFrom: validFrom);
     }
 
     [HttpPost]

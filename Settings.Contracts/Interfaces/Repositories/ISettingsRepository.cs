@@ -14,7 +14,7 @@ public interface ISettingsRepository
 
     Task<Setting> GetSettingAsync(int settingId);
 
-    Task<bool> IsSettingNameAlreadyTaken(string settingName);
+    Task<bool> IsSettingNameAlreadyTakenAsync(string settingName);
 
-    Task<SettingDto> GetSettingDto(int settingId, DateTime? validFrom);
+    Task<SettingDto> GetSettingDtoAsync(int settingId, DateTime? validFrom);
 }

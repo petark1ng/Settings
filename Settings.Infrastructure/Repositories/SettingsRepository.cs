@@ -64,12 +64,12 @@ public class SettingsRepository : RepositoryBase, ISettingsRepository
         return dbSetting;
     }
 
-    public async Task<bool> IsSettingNameAlreadyTaken(string settingName)
+    public async Task<bool> IsSettingNameAlreadyTakenAsync(string settingName)
     {
         return await AllWithoutTracking<Setting>().AnyAsync(x => x.Name.ToLower() == settingName.ToLower());
     }
 
-    public async Task<SettingDto> GetSettingDto(int settingId, DateTime? validFrom)
+    public async Task<SettingDto> GetSettingDtoAsync(int settingId, DateTime? validFrom)
     {
         IQueryable<SettingDto> settingsDtos = from dbSetting in AllWithoutTracking<Setting>().Where(x => x.Id == settingId)
                                               join dbSettingValues in AllWithoutTracking<SettingValue>()

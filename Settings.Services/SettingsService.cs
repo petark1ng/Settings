@@ -21,7 +21,7 @@ public class SettingsService : ISettingsService
 
     public async Task InsertSettingAsync(InsertSettingRequest request)
     {
-        bool isSettingNameTaken = await _settingsRepository.IsSettingNameAlreadyTaken(settingName: request.Name);
+        bool isSettingNameTaken = await _settingsRepository.IsSettingNameAlreadyTakenAsync(settingName: request.Name);
 
         if (isSettingNameTaken)
         {
@@ -95,10 +95,41 @@ public class SettingsService : ISettingsService
 
     public async Task DeleteSettingValueAsync(int settingId, int settingValueId)
     {
-        SettingValue dbSettingValue = await _settingsRepository.GetSettingValueAsync(settingId: settingId,
-                                                                                     settingValueId: settingValueId);
+        Setting dbSetting = await _settingsRepository.GetSettingAsync(settingId: settingId);
 
-        _settingsRepository.DeleteSettingValue(dbSettingValue);
+        SettingValue? dbSettingValueToBeDeleted = dbSetting.SettingValues.SingleOrDefault(x => x.Id == settingValueId);
+
+        if (dbSettingValueToBeDeleted is null)
+        {
+            throw new NotFoundException($"The setting value with id: {settingValueId} for setting with id: {settingId} was not found");
+        }
+
+        if (dbSettingValueToBeDeleted.ValidTo.HasValue)
+        {
+            SettingValue? previousSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidTo.HasValue &&
+                                                                                              x.ValidTo.Value == dbSettingValueToBeDeleted.ValidFrom.AddSeconds(-1));
+
+            if (previousSettingValue is not null)
+            {
+                SettingValue? nextSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidFrom == dbSettingValueToBeDeleted.ValidTo.Value.AddSeconds(1))
+                                                                         ?? throw new NotFoundException($"Internal server error.");
+
+                previousSettingValue.ValidTo = nextSettingValue.ValidFrom.AddSeconds(-1);
+            }
+        }
+        else
+        {
+            // This means that we are deleting the last setting, and we need to set validTo to the previous to null, so it must exist, if it doesnt that means it is only one.
+            SettingValue? previousSettingValue = dbSetting.SettingValues.SingleOrDefault(x => x.ValidTo.HasValue &&
+                                                                                              x.ValidTo.Value == dbSettingValueToBeDeleted.ValidFrom.AddSeconds(-1));
+
+            if (previousSettingValue is not null)
+            {
+                previousSettingValue.ValidTo = null;
+            }
+        }
+
+        _settingsRepository.DeleteSettingValue(dbSettingValueToBeDeleted);
 
         await _unitOfWork.SaveChangesAsync();
     }
